@@ -1,7 +1,7 @@
 # AADB Dataset classses
 # Kvhoeve
 # 26/7/22
-# GNU Public License v3.0
+# GNU General Public License v3.0
 
 # =============== functions for classes ==============
 # reading the mat annotations file into a pandas dataframe

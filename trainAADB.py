@@ -1,7 +1,7 @@
 # kvhoeve
 # 4/5/2022
 # Training AADB model
-# GNU Public License v3.0
+# GNU General Public License v3.0
 
 
 # Taken from the dataloader PyTorch tutorial at 4/5/2022
