@@ -1,4 +1,4 @@
-# Kim van Hoeve
+# kvhoeve
 # 3/8/2022
 # General Functions
 # GNU Public License v3.0

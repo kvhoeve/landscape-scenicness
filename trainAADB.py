@@ -1,4 +1,4 @@
-# Kim van Hoeve
+# kvhoeve
 # 4/5/2022
 # Training AADB model
 # GNU Public License v3.0

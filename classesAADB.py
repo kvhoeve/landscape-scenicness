@@ -1,5 +1,5 @@
 # AADB Dataset classses
-# Kim van Hoeve
+# Kvhoeve
 # 26/7/22
 # GNU Public License v3.0
 
