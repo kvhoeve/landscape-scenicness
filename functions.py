@@ -43,6 +43,20 @@ def unzip_file(root_path, file_name=""):
         with zipfile.ZipFile(os.path.join(root_path, (file_name + '.zip')), "r") as zip_ref:
             zip_ref.extractall(root_path)
 
+# ============== learning rate decay ========
+
+def exp_decay(epoch, initial_lrate=0.001, k=0.1):
+    # made with inspiration from Suki Lau on 7/8/2022 on:
+    # https://towardsdatascience.com/learning-rate-schedules-and-adaptive-learning-rate-methods-for-deep-learning-2c8f433990d1
+    """Decreases the learning rate with the number of epochs. 
+    Needs an initial learning rate and a factor (k) to decrease the learning rate with."""
+    # import package
+    import math
+       
+    lrate = initial_lrate * math.exp(-k*epoch)
+       
+    return lrate
+
 
 # =============== loop implementation ==============
 # train and test loop https://pytorch.org/tutorials/beginner/basics/optimization_tutorial.html
@@ -62,6 +76,7 @@ def train_loop(dataloader, model, loss_fn, optimizer, epoch_index, device):
     running_loss = 0.
     last_loss = 0.
     size = len(dataloader.dataset)
+    optimizer.param_groups[0]["lr"] = exp_decay(epoch=epoch_index)
 
     for batch, (X, y) in enumerate(dataloader):
         # place data on device

@@ -26,6 +26,9 @@ from functions import *
 
 
 # =============== Important variables ==============
+# for reprodicibility
+torch.manual_seed(1618)
+
 # variables for paths
 base_path = "./data/AADB"
 run_path = "runs"
@@ -63,20 +66,19 @@ preprocess = transforms.Compose([
 # =============== hyper parameters ==============
 
 epochs = 1
-b_size = 24
-learning_rate = 1e-3
+b_size = 16
 num_worker = 0
-early_stop_tol = 5
+early_stop_tol = 100
 epoch_num = 0
 best_eval_loss = 1_000_000.
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-model_name = 'resnet18'
+model_name = 'resnet50'
 
 
 # =============== model ==============
 # Loading in the ResNet-X model from the Pytorch repository
 
-model = torch.hub.load('pytorch/vision:v0.10.0', model_name, pretrained=True)
+model = torch.hub.load('pytorch/vision:v0.10.0', model_name, pretrained=False)
 num_features = model.fc.in_features
 model.fc = nn.Sequential(
     nn.Linear(num_features, 12),
@@ -94,12 +96,11 @@ train_dataloader = DataLoader(train_data, batch_size=b_size, shuffle=True, num_w
 eval_dataloader = DataLoader(val_data, batch_size=b_size, shuffle=True, num_workers=num_worker, pin_memory=True)
 test_dataloader = DataLoader(test_data, batch_size=b_size, shuffle=True, num_workers=num_worker, pin_memory=True)
 
-
-
 # =============== loss & optimizer ==============
-
+    
 loss_fn = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
+# learning rate is scheduled in the training loop (see functions.py)
+optimizer = torch.optim.Adam(model.parameters())
 
 
 # =============== calling ==============
@@ -120,7 +121,7 @@ d1 = timedelta(hours=int(start_time[0:2]), minutes=int(start_time[3:5]), seconds
 
 for t in range(epochs):
     print(f"Epoch {epoch_num + 1}\n-------------------------------")
-    avg_train_loss = train_loop(train_dataloader, model, loss_fn, optimizer, epoch_index=epochs, device=device)
+    avg_train_loss = train_loop(train_dataloader, model, loss_fn, optimizer, epoch_index=t, device=device)
     train_loss_list.append(avg_train_loss)
     avg_eval_loss, eval_acc = eval_loop(eval_dataloader, model, loss_fn, device=device)
     eval_loss_list.append(avg_eval_loss)
