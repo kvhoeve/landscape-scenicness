@@ -30,7 +30,7 @@ def make_dir(rel_path, folder=""):
 # =============== loading data ==============
 
 def unzip_file(root_path, file_name=""):
-    """Checks if a file is unzipped and unzips it in target """
+    """Checks if a file is unzipped and unzips it in target path."""
     # import packages
     import os
     import zipfile
@@ -42,6 +42,22 @@ def unzip_file(root_path, file_name=""):
         print("Unzipping data file")
         with zipfile.ZipFile(os.path.join(root_path, (file_name + '.zip')), "r") as zip_ref:
             zip_ref.extractall(root_path)
+
+
+def extract_tarfile(root_path, file_name="", doc_name=""):
+    """Checks if a file is unzipped and unzips it in target """
+    # import packages
+    import os
+    import tarfile
+    
+    # unzip data files
+    if os.path.isdir(os.path.join(root_path, doc_name)):
+        pass
+    else:
+        print("Extracting data from tarfile")
+        with tarfile.TarFile(os.path.join(root_path, (file_name + '.tar')), "r") as tar_ref:
+            tar_ref.extractall(root_path)
+
 
 # ============== learning rate decay ========
 
