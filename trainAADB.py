@@ -17,7 +17,9 @@ from torch.utils.tensorboard import SummaryWriter
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
-
+# Ignore warnings
+import warnings
+warnings.filterwarnings("ignore")
 
 # ============== functions ==================
 # Import classes and functions specialized for this dataset
@@ -114,6 +116,7 @@ eval_loss_list = []
 eval_acc_list = []
 epoch_list = list(range(1, epochs + 1, 1))
 
+
 # record time passing
 start_time = datetime.now().strftime('%X')
 d1 = timedelta(hours=int(start_time[0:2]), minutes=int(start_time[3:5]), seconds=int(start_time[6:8]))
@@ -121,12 +124,16 @@ d1 = timedelta(hours=int(start_time[0:2]), minutes=int(start_time[3:5]), seconds
 
 for t in range(epochs):
     print(f"Epoch {epoch_num + 1}\n-------------------------------")
-    avg_train_loss = train_loop(train_dataloader, model, loss_fn, optimizer, epoch_index=t, device=device)
+    avg_train_loss, lbl_list, pred_list = train_loop(train_dataloader, model, loss_fn, optimizer, epoch_index=t, device=device)
     train_loss_list.append(avg_train_loss)
+    # visualize training
+    prediction_fig(lbl_list, pred_list)
+    
+    # evaluation
     avg_eval_loss, eval_acc = eval_loop(eval_dataloader, model, loss_fn, device=device)
     eval_loss_list.append(avg_eval_loss)
     eval_acc_list.append(eval_acc)
-
+    
     # Log the running loss averaged per batch
     # for both training and validation
     writer.add_scalars('Training vs. Validation Loss',

@@ -68,6 +68,8 @@ def train_loop(dataloader, model, loss_fn, optimizer, epoch_index, device):
     # import pacakges
     import torch
     import torch.cuda
+    import numpy as np
+    import pandas as pd
     
     # turn on model train mode
     model.train()
@@ -76,6 +78,8 @@ def train_loop(dataloader, model, loss_fn, optimizer, epoch_index, device):
     running_loss = 0.
     last_loss = 0.
     size = len(dataloader.dataset)
+    target_list = []
+    prediction_list = []
     optimizer.param_groups[0]["lr"] = exp_decay(epoch=epoch_index)
 
     for batch, (X, y) in enumerate(dataloader):
@@ -91,7 +95,15 @@ def train_loop(dataloader, model, loss_fn, optimizer, epoch_index, device):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
+        
+        # append labels to arrays for plotting
+        for t in range(len(y)):
+            for i in range(len(y[1])):
+                target_label = float(torch.round(y[t][i], decimals=1).detach().cpu())
+                prediction_label = float(torch.round(pred[t][i], decimals=1).detach().cpu())
+                target_list.append(target_label)
+                prediction_list.append(prediction_label)
+        
         running_loss += loss.item()
         if batch % 100 == 0:
             loss, current = loss.item(), batch * len(X)
@@ -99,7 +111,8 @@ def train_loop(dataloader, model, loss_fn, optimizer, epoch_index, device):
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
             running_loss = 0.
 
-    return last_loss
+    
+    return last_loss, target_list, prediction_list
 
 
 def eval_loop(dataloader, model, loss_fn, device):
@@ -120,13 +133,13 @@ def eval_loop(dataloader, model, loss_fn, device):
             pred = model(X)
             eval_loss += loss_fn(pred, y).item()
             # keeping track of the number of correctly predicted numbers
-            for i in range(len(y)):
-                for num in torch.round(y[i], decimals=1) == torch.round(pred[i], decimals=1):
+            for t in range(len(y)):
+                for num in torch.round(y[t], decimals=1) == torch.round(pred[t], decimals=1):
                     if num:
                         correct += 1
 
     eval_loss /= num_batches
-    eval_epoch_acc = correct / (size * 12)
+    eval_epoch_acc = correct / (size * len(y[1]))
     print(f"Eval Error: \n Accuracy: {(100*eval_epoch_acc):>0.1f}%, Avg loss: {eval_loss:>8f} \n")
     return eval_loss, eval_epoch_acc
 
@@ -140,6 +153,8 @@ def test_loop(dataloader, model, loss_fn, device):
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
     testloop_loss, correct = 0, 0
+    target_scorelist = []
+    prediction_scorelist = []
 
     with torch.no_grad():
         for X, y in dataloader:
@@ -147,15 +162,25 @@ def test_loop(dataloader, model, loss_fn, device):
             y = y.to(device).float()
             pred = model(X)
             testloop_loss += loss_fn(pred, y).item()
+            
+            # tally correct values for accuracy
             for i in range(len(y)):
                 for num in torch.round(y[i], decimals=1) == torch.round(pred[i], decimals=1):
                     if num:
                         correct += 1
 
+                target_score = float(torch.round(y[i][1], decimals=1).detach().cpu())
+                prediction_score = float(torch.round(pred[i][1], decimals=1).detach().cpu())
+                target_scorelist.append(target_score)
+                prediction_scorelist.append(prediction_score)
+    
+    # metrics                    
     testloop_loss /= num_batches
-    test_acc = correct / (size * 12)
+    test_acc = correct / (size * len(y[1]))
+    s_r = spearmanr(torch.Tensor(target_scorelist), torch.Tensor(prediction_scorelist))
     print(f"Test Error: \n Accuracy: {(100 * test_acc):>0.1f}%, Avg loss: {testloop_loss:>8f} \n")
-    return testloop_loss, test_acc
+    print(f"Spearman correlation on the aesthetic score: {s_r:.2f}")
+    return testloop_loss, test_acc, s_r
 
 # =================== performance functions ====================
 
@@ -187,7 +212,7 @@ def performance_fig(epochs_list, training_loss, validation_loss, fig_name, fig_p
     #import packages
     import os
     import matplotlib
-    matplotlib.use('TkAgg')
+   # matplotlib.use('TkAgg')
     import matplotlib.pyplot as plt
     plt.ion()   # interactive mode    
         
@@ -203,6 +228,39 @@ def performance_fig(epochs_list, training_loss, validation_loss, fig_name, fig_p
     plt.savefig(os.path.join(fig_path, fig_name))
 
     return(ax)
+    
+def prediction_fig(target, prediction):
+    # taken from the pyplot manual on 26/7/2022
+    # https://matplotlib.org/stable/tutorials/introductory/usage.html#sphx-glr-tutorials-introductory-usage-py
+    """Creates a figure showing the performance of the model. Uses matplotlib pyplot """
+    #import packages
+    import numpy as np
+    import matplotlib.pyplot as plt
+    plt.ion()   # interactive mode    
+    
+    # create scatterplot
+    plt.scatter(target, prediction)    
+    
+    z = np.polyfit(target, prediction, 1)
+    p = np.poly1d(z)
+    plt.plot(target,p(target),"r--")
+    plt.xlabel("target labels (y)")
+    plt.ylabel("prediction labels (y^)")
+    
+    return plt.show()
 
+def spearmanr(x1, x2):
+    """Takes two torch tensors and first calculates the covaraince (num) and
+    the producct of the sqaure root to divide them and calculate the Pearson correlation. """
+    # import package
+    import torch
+    
+    vx = x1 - torch.mean(x1)
+    vy = x2 - torch.mean(x2)
 
+    num = torch.sum(vx * vy)
+    den = torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2))
+
+    return num / den
+    
 # =================================================================================================================
