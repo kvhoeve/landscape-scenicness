@@ -62,7 +62,7 @@ preprocess = transforms.Compose([
 
 # =============== hyper parameters ==============
 
-epochs = 1
+epochs = 50
 b_size = 16
 num_worker = 0
 early_stop_tol = 100
@@ -108,7 +108,7 @@ train_loss_list = []
 eval_loss_list = []
 eval_acc_list = []
 epoch_list = list(range(1, epochs + 1, 1))
-
+early_stop = 0
 
 # record time passing
 start_time = datetime.now().strftime('%X')

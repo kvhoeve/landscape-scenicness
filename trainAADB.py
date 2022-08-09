@@ -115,6 +115,7 @@ train_loss_list = []
 eval_loss_list = []
 eval_acc_list = []
 epoch_list = list(range(1, epochs + 1, 1))
+early_stop = 0
 
 
 # record time passing
