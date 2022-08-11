@@ -160,7 +160,7 @@ def eval_loop(dataloader, model, loss_fn, device):
     return eval_loss, eval_epoch_acc
 
 
-def test_loop(dataloader, model, loss_fn, device):
+def test_loop(dataloader, model, loss_fn, device, attributes=None):
     # import packages
     import torch
     import torch.cuda
@@ -169,8 +169,9 @@ def test_loop(dataloader, model, loss_fn, device):
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
     testloop_loss, correct = 0, 0
-    target_scorelist = []
-    prediction_scorelist = []
+    target_list = []
+    prediction_list = []
+    spearman_list = []
 
     with torch.no_grad():
         for X, y in dataloader:
@@ -180,23 +181,47 @@ def test_loop(dataloader, model, loss_fn, device):
             testloop_loss += loss_fn(pred, y).item()
             
             # tally correct values for accuracy
-            for i in range(len(y)):
-                for num in torch.round(y[i], decimals=1) == torch.round(pred[i], decimals=1):
+            for t in range(len(y)):
+                for num in torch.round(y[t], decimals=1) == torch.round(pred[t], decimals=1):
                     if num:
                         correct += 1
-
-                target_score = float(torch.round(y[i][1], decimals=1).detach().cpu())
-                prediction_score = float(torch.round(pred[i][1], decimals=1).detach().cpu())
-                target_scorelist.append(target_score)
-                prediction_scorelist.append(prediction_score)
+                # create long lists with target and predictions for all images in the set
+                for i in range(len(y[1])):
+                    target_label = float(torch.round(y[t][i], decimals=1).detach().cpu())
+                    prediction_label = float(torch.round(pred[t][i], decimals=1).detach().cpu())
+                    target_list.append(target_label)
+                    prediction_list.append(prediction_label)
+                    
     
     # metrics                    
     testloop_loss /= num_batches
     test_acc = correct / (size * len(y[1]))
-    s_r = spearmanr(torch.Tensor(target_scorelist), torch.Tensor(prediction_scorelist))
+    
+    # calculate the 
+    for u in range(len(y[1])):
+        att_targetscore = []
+        att_predscore = []
+        for att in range(u, len(target_list), len(y[1])):
+            att_targetscore.append(target_list[att])
+            att_predscore.append(prediction_list[att])
+        
+        s_r = spearmanr(torch.Tensor(att_targetscore), torch.Tensor(att_predscore))
+        spearman_list.append(s_r)
+        
+    # printing results    
     print(f"Test Error: \n Accuracy: {(100 * test_acc):>0.1f}%, Avg loss: {testloop_loss:>8f} \n")
-    print(f"Spearman correlation on the aesthetic score: {s_r:.2f}")
-    return testloop_loss, test_acc, s_r
+    
+    # printing every spearman correlation value for every attribute
+    for s in range(len(spearman_list)):
+        if attributes == None:
+            print(f"Spearman correlation on attribute {s} : {spearman_list[s]:>.2f}")
+        else:
+            print(f"Spearman correlation on attribute {attributes[s]} : {spearman_list[s]:>.2f}")
+    
+    # create a prediction figure
+    prediction_fig(target_list, prediction_list)
+        
+    return testloop_loss, test_acc, target_list, prediction_list
 
 # =================== performance functions ====================
 
@@ -235,7 +260,7 @@ def performance_fig(epochs_list, training_loss, validation_loss, fig_name, fig_p
     fig, ax = plt.subplots(figsize=(15, 7.5), layout='constrained')
     ax.plot(epochs_list, training_loss, label='Training loss')
     ax.plot(epochs_list, validation_loss, label= 'Validation loss')
-    ax.set_title('Train loss and Validation loss over epochs AADB')
+    ax.set_title('Train loss and Validation loss over epochs')
     ax.set_xlabel('Epochs')
     ax.set_ylabel('Loss')
     ax.grid(True)
