@@ -45,7 +45,8 @@ def mat_to_pddf(root, mat_name='AADBinfo.mat', dataset = "train"):
 
 def pil_loader(path):
     """Opens an image in RGB. Opens path as file to avoid ResourceWarning 
-    taken from (https://github.com/python-pillow/Pillow/issues/835) """
+    taken from (https://github.com/python-pillow/Pillow/issues/835) by Kanoc
+    on 9/5/22"""
     # import package
     from PIL import Image
     
@@ -55,10 +56,9 @@ def pil_loader(path):
 
 # =============== classes ==============
 # creating dataloader by first defining the dataset
-# This was created by Kim van Hoeve using this tutorial by PyTorch,
+# This was created by KvHoeve using this tutorial by PyTorch,
 # accessed on 11/5/2022 at https://pytorch.org/tutorials/beginner/basics/data_tutorial.html
-# early stopping implementation https://stackoverflow.com/questions/71998978/early-stopping-in-pytorch
-# With adaptations from on 28/7/2022
+# With adaptations from isaaccorley on 28/7/2022
 # https://github.com/isaaccorley/deep-aesthetics-pytorch/blob/main/torch_aesthetics/aadb.py
 
 

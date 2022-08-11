@@ -1,4 +1,4 @@
-# Kim van Hoeve
+# KvHoeve
 # 8/8/2022
 # transient attributes classes
 
@@ -32,8 +32,11 @@ def clean_tsv(path):
     import pandas as pd
     
     df = pd.read_csv(path, header=None, sep='\t')
+    
     # only keep the columns containing the information needed
-    att_df = df.iloc[:, [6,7,8,9,10,29,30,31]]
+    # change the column numbers to the attributes you want to keep.
+    att_df = df.iloc[:, 1:]
+    
     # The file contains attribute scores and confidences, 
     # the following only keeps the scores. 
     rm_conf = att_df.applymap(lambda x: x[:x.find(',')])
@@ -41,28 +44,56 @@ def clean_tsv(path):
     final_df = pd.concat([df[0], rm_conf], axis=1)
     
     return final_df
-    
-    
         
-    
 
 # =============== classes ==============
-# This was created by Kim van Hoeve using this tutorial by PyTorch,
+# This was created by KvHoeve using this tutorial by PyTorch,
 # accessed on 11/5/2022 at https://pytorch.org/tutorials/beginner/basics/data_tutorial.html
 
 
 class TransAttributes(Dataset):
 
     attributes = [
-        "sunny",
-        "clouds",
-        "fog",
-        "storm",
-        "snow",
-        "windy",
-        "rain",
-        "ice"
-        
+            "dirty",
+            "daylight",
+            "night",
+            "sunrisesunset",
+            "dawndusk",
+            "sunny",
+            "clouds",
+            "fog",
+            "storm",
+            "snow",
+            "warm",
+            "cold",
+            "busy",
+            "beautiful",
+            "flowers",
+            "spring",
+            "summer",
+            "autumn",
+            "winter",
+            "glowing",
+            "colorful",
+            "dull",
+            "rugged",
+            "midday",
+            "dark",
+            "bright",
+            "dry",
+            "moist",
+            "windy",
+            "rain",
+            "ice",
+            "cluttered",
+            "soothing",
+            "stressful",
+            "exciting",
+            "sentimental",
+            "mysterious",
+            "boring",
+            "gloomy",
+            "lush"       
     ]
     
     
