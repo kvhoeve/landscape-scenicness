@@ -55,6 +55,7 @@ extract_tarfile(base_path, "unaligned_images", doc_name="imageLD")
 preprocess = transforms.Compose([
     transforms.Resize(256),
     transforms.CenterCrop(224),
+    transforms.RandomHorizontalFlip(p=0.5),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
@@ -62,10 +63,10 @@ preprocess = transforms.Compose([
 
 # =============== hyper parameters ==============
 
-epochs = 50
+epochs = 1
 b_size = 16
 num_worker = 0
-early_stop_tol = 100
+early_stop_tol = 101 # to disable increase to > epochs
 epoch_num = 0
 best_eval_loss = 1_000_000.
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -74,10 +75,10 @@ model_name = 'resnet50'
 
 # =============== model ==============
 # Loading in the ResNet-X model from the Pytorch repository
-model = torch.hub.load('pytorch/vision:v0.10.0', model_name, pretrained=False)
+model = torch.hub.load('pytorch/vision:v0.10.0', model_name, pretrained=True)
 num_features = model.fc.in_features
 model.fc = nn.Sequential(
-    nn.Linear(num_features, 8),
+    nn.Linear(num_features, 40),
     nn.Sigmoid())
 model.to(device)
 
