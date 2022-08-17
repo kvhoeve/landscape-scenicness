@@ -228,7 +228,9 @@ def CAM_loop(dataloader, model, save_path, device, attribute_list):
     with no fully connected layers. Saves an image with the input image
     and the resulting Class Activation Map in a file of your choice (save_path).
     One heatmap generated per attribute.
-    Model can be a path or ResNet object. """
+    Model can be a path or ResNet object. cv2 image visualization was partly
+    taken from zhoubolei on 17/8/22 on:
+        https://github.com/zhoubolei/CAM/blob/master/pytorch_CAM.py"""
     # import packages
     import torch
     from torch import nn
