@@ -98,7 +98,7 @@ def train_loop(dataloader, model, loss_fn, optimizer, epoch_index, device):
     prediction_list = []
     optimizer.param_groups[0]["lr"] = exp_decay(epoch=epoch_index)
 
-    for batch, (X, y) in enumerate(dataloader):
+    for batch, (X, y, p) in enumerate(dataloader):
         # place data on device
         X = X.to(device)
         y = y.to(device).float()
@@ -143,7 +143,7 @@ def eval_loop(dataloader, model, loss_fn, device):
     eval_loss, correct = 0, 0
 
     with torch.no_grad():
-        for X, y in dataloader:
+        for X, y, p in dataloader:
             X = X.to(device)
             y = y.to(device).float()
             pred = model(X)
@@ -174,7 +174,7 @@ def test_loop(dataloader, model, loss_fn, device, attributes=None):
     spearman_list = []
 
     with torch.no_grad():
-        for X, y in dataloader:
+        for X, y, p in dataloader:
             X = X.to(device)
             y = y.to(device).float()
             pred = model(X)
