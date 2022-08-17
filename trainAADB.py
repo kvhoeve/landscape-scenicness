@@ -36,6 +36,7 @@ base_path = "./data/AADB"
 run_path = "runs"
 model_path = "models"
 fig_path = "figures"
+cam_path = "cam"
 
 
 
@@ -45,6 +46,7 @@ make_dir(base_path)
 make_dir(base_path, run_path)
 make_dir(base_path, model_path)
 make_dir(base_path, fig_path)
+make_dir(base_path, cam_path)
 
 
 # ================ Unzip folders ==================

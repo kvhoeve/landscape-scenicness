@@ -32,6 +32,7 @@ base_path = "./data/transient_attributes"
 run_path = "runs"
 model_path = "models"
 fig_path = "figures"
+cam_path = "cam"
 
 
 # =============== make directories ==============
@@ -40,7 +41,7 @@ make_dir(base_path)
 make_dir(base_path, run_path)
 make_dir(base_path, model_path)
 make_dir(base_path, fig_path)
-
+make_dir(base_path, cam_path)
 
 # ================ Access folders ==================
 # If you haven't, please download the necessary files:
@@ -63,7 +64,7 @@ preprocess = transforms.Compose([
 
 # =============== hyper parameters ==============
 
-epochs = 1
+epochs = 100
 b_size = 16
 num_worker = 0
 early_stop_tol = 101 # to disable increase to > epochs

@@ -50,52 +50,50 @@ def clean_tsv(path):
 # This was created by KvHoeve using this tutorial by PyTorch,
 # accessed on 11/5/2022 at https://pytorch.org/tutorials/beginner/basics/data_tutorial.html
 
-
+attributes = [
+         "dirty",
+         "daylight",
+         "night",
+         "sunrisesunset",
+         "dawndusk",
+         "sunny",
+         "clouds",
+         "fog",
+         "storm",
+         "snow",
+         "warm",
+         "cold",
+         "busy",
+         "beautiful",
+         "flowers",
+         "spring",
+         "summer",
+         "autumn",
+         "winter",
+         "glowing",
+         "colorful",
+         "dull",
+         "rugged",
+         "midday",
+         "dark",
+         "bright",
+         "dry",
+         "moist",
+         "windy",
+         "rain",
+         "ice",
+         "cluttered",
+         "soothing",
+         "stressful",
+         "exciting",
+         "sentimental",
+         "mysterious",
+         "boring",
+         "gloomy",
+         "lush"       
+ ]
+ 
 class TransAttributes(Dataset):
-
-    attributes = [
-            "dirty",
-            "daylight",
-            "night",
-            "sunrisesunset",
-            "dawndusk",
-            "sunny",
-            "clouds",
-            "fog",
-            "storm",
-            "snow",
-            "warm",
-            "cold",
-            "busy",
-            "beautiful",
-            "flowers",
-            "spring",
-            "summer",
-            "autumn",
-            "winter",
-            "glowing",
-            "colorful",
-            "dull",
-            "rugged",
-            "midday",
-            "dark",
-            "bright",
-            "dry",
-            "moist",
-            "windy",
-            "rain",
-            "ice",
-            "cluttered",
-            "soothing",
-            "stressful",
-            "exciting",
-            "sentimental",
-            "mysterious",
-            "boring",
-            "gloomy",
-            "lush"       
-    ]
-    
     
     annotations_file = "annotations.tsv"
     
@@ -123,9 +121,9 @@ class TransAttributes(Dataset):
     def __getitem__(self, idx):
         img_path = os.path.join(self.root, self.img_root, self.labels.iloc[idx, 0])
         image = pil_loader(img_path)
-        label = self.labels.iloc[idx, 1:]
+        label = self.labels.iloc[idx,1:]
         label = torch.from_numpy(np.array(label, dtype=float))
         if self.transform:
             image = self.transform(image)
-        return image, label
+        return image, label, img_path
 

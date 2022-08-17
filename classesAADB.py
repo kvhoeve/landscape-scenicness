@@ -61,23 +61,23 @@ def pil_loader(path):
 # With adaptations from isaaccorley on 28/7/2022
 # https://github.com/isaaccorley/deep-aesthetics-pytorch/blob/main/torch_aesthetics/aadb.py
 
+attributes = [
+      "score",
+      "balancing_elements",
+      "color_harmony",
+      "content",
+      "depth_of_field",
+      "light",
+      "motion_blur",
+      "object",
+      "repetition",
+      "rule_of_thirds",
+      "symmetry",
+      "vivid_color"
+  ]
 
 class AADB(Dataset):
 
-    attributes = [
-        "score",
-        "balancing_elements",
-        "color_harmony",
-        "content",
-        "depth_of_field",
-        "light",
-        "motion_blur",
-        "object",
-        "repetition",
-        "rule_of_thirds",
-        "symmetry",
-        "vivid_color"
-    ]
 
     splits = {
         "train": {"idx": 0, "file": "imgListTrainRegression_score.txt"},
@@ -136,7 +136,7 @@ class AADB(Dataset):
         if self.transform:
             x = self.transform(x)
 
-        return x, y
+        return x, y, img_name
 
 
 
