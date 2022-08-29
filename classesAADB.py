@@ -12,6 +12,7 @@ import os
 import torch
 import torch.cuda
 from torch.utils.data import Dataset
+from torch import nn
 import numpy as np
 from mat4py import loadmat
 
@@ -138,5 +139,25 @@ class AADB(Dataset):
 
         return x, y, img_name
 
-
+class AADBCAM(nn.Module):
+    def __init__(self):
+        """ A newly defined model architecture that uses ResNet50 as a base,
+        but has no fully vonnected layers. Instead, it uses convolutions and
+        a global average pool to create Class Activation Maps.
+        Lastly, another avreage pool layer creates the score per attribute."""        
+        super(AADBCAM, self).__init__()
+        
+        self.base = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', pretrained=True)
+        self.base.fc = nn.Identity()
+        self.base.avgpool = nn.Identity()
+        self.cam = nn.Sequential(nn.Conv2d(2048, 12, 1), 
+                                 nn.AdaptiveAvgPool2d(224))
+        self.score = nn.Sequential(nn.AdaptiveAvgPool2d(1))
+        
+    def forward(self, img):
+        x = self.base(img)
+        maps = self.cam(torch.reshape(x, (len(img), 2048, 7, 7)))
+        scores = self.score(maps)        
+        
+        return maps, scores
 
