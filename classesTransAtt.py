@@ -9,6 +9,7 @@ import os
 import torch
 import torch.cuda
 from torch.utils.data import Dataset
+from torch import nn
 import numpy as np
 
 
@@ -101,18 +102,34 @@ class TransAttributes(Dataset):
                  root,
                  img_root="imageLD",
                  lbl_root="annotations",
+                 split_root = "holdout_split",
+                 split = "train",
                  transform=None):
         """Args:
                 root = base path to correct directory
                 img_root = path to folder containing images
                 lbl_root = path to folder containing labels
+                split_root = path to folder to the image paths for the split 
                 """
 
         self.root = root
         self.img_root = img_root
         self.lbl_root = lbl_root
-        self.labels = clean_tsv(os.path.join(root, lbl_root, "annotations.tsv"))
+        self.split_root = split_root
         self.transform = transform
+        self.full_lbl = clean_tsv(os.path.join(root, lbl_root, "annotations.tsv"))
+        
+        if split == "train":
+            self.file = os.path.join(self.root, self.split_root, "training.txt")
+            with open(self.file, "r") as f:
+                self.indices = f.read().splitlines()
+        elif split == "test":
+            self.file = os.path.join(self.root, self.split_root, "test.txt")
+            with open(self.file, "r") as f:
+                self.indices = f.read().splitlines()
+            
+        self.labels = self.full_lbl.loc[self.full_lbl[0].isin(self.indices)]
+        
 
     def __len__(self):
         return len(self.labels)
@@ -127,3 +144,30 @@ class TransAttributes(Dataset):
             image = self.transform(image)
         return image, label, img_path
 
+
+class TACAM(nn.Module):
+    def __init__(self):
+        """ A newly defined model architecture that uses ResNet50 as a base,
+        but has no fully vonnected layers. Instead, it uses convolutions and
+        a global average pool to create Class Activation Maps.
+        Lastly, another avreage pool layer creates the score per attribute."""        
+        super(TACAM, self).__init__()
+        
+        self.base = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', pretrained=True)
+        self.base.fc = nn.Identity()
+        self.base.avgpool = nn.Identity()
+        self.cam = nn.Sequential(nn.Conv2d(2048, 40, 1), 
+                                 nn.AdaptiveAvgPool2d(224))
+        self.score = nn.Sequential(nn.AdaptiveAvgPool2d(1))
+        
+    def forward(self, img):
+        x = self.base(img)
+        maps = self.cam(torch.reshape(x, (len(img), 2048, 7, 7)))
+        scores = self.score(maps)        
+        
+        return maps, scores
+             
+            
+        
+        
+    
