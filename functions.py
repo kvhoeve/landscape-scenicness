@@ -84,8 +84,6 @@ def train_loop(dataloader, model, loss_fn, optimizer, epoch_index, device):
     # import pacakges
     import torch
     import torch.cuda
-    import numpy as np
-    import pandas as pd
     
     # turn on model train mode
     model.train()
@@ -115,8 +113,8 @@ def train_loop(dataloader, model, loss_fn, optimizer, epoch_index, device):
         # append labels to arrays for plotting
         for t in range(len(y)):
             for i in range(len(y[1])):
-                target_label = float(torch.round(y[t][i], decimals=1).detach().cpu())
-                prediction_label = float(torch.round(pred[t][i], decimals=1).detach().cpu())
+                target_label = float(y[t][i].detach().to('cpu'))
+                prediction_label = float(pred[t][i].detach().to('cpu'))
                 target_list.append(target_label)
                 prediction_list.append(prediction_label)
         
@@ -157,6 +155,7 @@ def eval_loop(dataloader, model, loss_fn, device):
     eval_loss /= num_batches
     eval_epoch_acc = correct / (size * len(y[1]))
     print(f"Eval Error: \n Accuracy: {(100*eval_epoch_acc):>0.1f}%, Avg loss: {eval_loss:>8f} \n")
+    
     return eval_loss, eval_epoch_acc
 
 
@@ -187,8 +186,8 @@ def test_loop(dataloader, model, loss_fn, device, attributes=None):
                         correct += 1
                 # create long lists with target and predictions for all images in the set
                 for i in range(len(y[1])):
-                    target_label = float(torch.round(y[t][i], decimals=1).detach().cpu())
-                    prediction_label = float(torch.round(pred[t][i], decimals=1).detach().cpu())
+                    target_label = float(y[t][i].detach().to('cpu'))
+                    prediction_label = float(pred[t][i].detach().to('cpu'))
                     target_list.append(target_label)
                     prediction_list.append(prediction_label)
                     
@@ -221,61 +220,11 @@ def test_loop(dataloader, model, loss_fn, device, attributes=None):
     # create a prediction figure
     prediction_fig(target_list, prediction_list)
         
-    return testloop_loss, test_acc, target_list, prediction_list
+    #return testloop_loss, test_acc, target_list, prediction_list
 
-def CAM_loop(dataloader, model, save_path, device, attribute_list):
-    """CAM implementation for ResNet models. Re-initialzes a CAM model
-    with no fully connected layers. Saves an image with the input image
-    and the resulting Class Activation Map in a file of your choice (save_path).
-    One heatmap generated per attribute.
-    Model can be a path or ResNet object. cv2 image visualization was partly
-    taken from zhoubolei on 17/8/22 on:
-        https://github.com/zhoubolei/CAM/blob/master/pytorch_CAM.py"""
-    # import packages
-    import torch
-    from torch import nn
-    import torch.cuda
-    import cv2
-    import numpy as np
-    import os
 
-    
-    # initialize the model
-    # check if model is a path or a ResNet object
-    try:
-        model = torch.load(model)
-    except AttributeError:
-        pass
-    
-    # change avgpool layer to a convolution followed by a global average pool
-    model.avgpool = nn.Sequential(nn.Conv2d(2048, len(attribute_list), 1), 
-                                  nn.AdaptiveAvgPool2d(224))
-    model.eval()
-    # remove fullly connected layers
-    model.fc = nn.Sequential(*list(model.fc.children())[:-2])
-    model.to(device)
-    
-    # loop though the data
-    with torch.no_grad():
-        for X, y, p in dataloader:
-            X = X.to(device)
-            y = y.to(device).float()
-            pred = model(X)
-            
-    
-            for t in range(len(X)):
-                img = cv2.imread(p[t])
-                np_pred = np.array(pred[t].reshape(len(attribute_list),224,224).detach().to('cpu')*255, dtype=np.uint8)
-                height, width, _ = img.shape
-                
-                for a in range(len(attribute_list)):
-                    heatmap = cv2.applyColorMap(cv2.resize(np_pred[a],(width, height)), cv2.COLORMAP_JET)
-                    result = cv2.addWeighted(heatmap, 0.3, img, 0.7, 0)
-                    split_1 = p[t].split('\\')
-                    split_2 = split_1[-1]
-                    split_3 = split_2[:-5].split('/')
-                    save_name = split_3[0] + '_' + split_3[1] + '_' + attribute_list[a] + '.png'
-                    cv2.imwrite(os.path.join(save_path, save_name), result)
+
+
 
 # =================== performance functions ====================
 
@@ -311,7 +260,7 @@ def performance_fig(epochs_list, training_loss, validation_loss, fig_name, fig_p
     import matplotlib.pyplot as plt
     plt.ion()   # interactive mode    
         
-    fig, ax = plt.subplots(figsize=(25, 12.5), layout='constrained')
+    fig, ax = plt.subplots(figsize=(25, 12.5))
     ax.plot(epochs_list, training_loss, label='Training loss')
     ax.plot(epochs_list, validation_loss, label= 'Validation loss')
     ax.set_title('Train loss and Validation loss over epochs')
@@ -358,4 +307,140 @@ def spearmanr(x1, x2):
 
     return num / den
     
-# =================================================================================================================
+# ======================= CAM implementation ========================================
+
+
+def cam_train(dataloader, model, loss_fn, optimizer, epoch_index, device):
+    """Loops through training data and makes predictions for the data.
+    Records the loss claculated by the loss functions."""
+    # import pacakges
+    import torch
+    import torch.cuda
+    
+    # turn on model train mode
+    model.train()
+
+    # assigning important variables
+    running_loss = 0.
+    last_loss = 0.
+    size = len(dataloader.dataset)
+    target_list = []
+    prediction_list = []
+    optimizer.param_groups[0]["lr"] = exp_decay(epoch=epoch_index)
+
+    for batch, (X, y, p) in enumerate(dataloader):
+        # place data on device
+        X = X.to(device)
+        y = y.to(device).float()
+
+        # Compute prediction and loss
+        cam, pred = model(X)
+        loss = loss_fn(pred, y)
+
+        # Backpropagation
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        # append labels to arrays for plotting
+        for t in range(len(y)):
+            for i in range(len(y[1])):
+                target_label = float(y[t][i].detach().to('cpu'))
+                prediction_label = float(pred[t][i].detach().to('cpu'))
+                target_list.append(target_label)
+                prediction_list.append(prediction_label)
+        
+        running_loss += loss.item()
+        if batch % 100 == 0:
+            loss, current = loss.item(), batch * len(X)
+            last_loss = running_loss/100
+            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            running_loss = 0.
+
+    
+    return last_loss, target_list, prediction_list
+
+
+def cam_eval(dataloader, model, loss_fn, device):
+    """Ëvaluation of the model on the evaluation dataset. Used for tuning."""
+    # import packages
+    import torch
+    import torch.cuda
+    
+    model.eval()
+    size = len(dataloader.dataset)
+    num_batches = len(dataloader)
+    eval_loss, correct = 0, 0
+
+    with torch.no_grad():
+        for X, y, p in dataloader:
+            X = X.to(device)
+            y = y.to(device).float()
+            cam, pred = model(X)
+            eval_loss += loss_fn(pred, y).item()
+            
+            # flattening tensor from (batch_size, att, 1, 1) to (batch_size, att)
+            flat_pred1 = pred.squeeze(-1)
+            flat_pred2 = flat_pred1.squeeze(-1)
+            # keeping track of the number of correctly predicted numbers
+            for t in range(len(y)):
+                    for num in torch.round(y[t], decimals=1) == torch.round(flat_pred2[t], decimals=1):
+                        if num:
+                            correct += 1
+
+    eval_loss /= num_batches
+    eval_epoch_acc = correct / (size * len(y[0]))
+    print(f"Eval Error: \n Accuracy: {(100*eval_epoch_acc):>0.1f}%, Avg loss: {eval_loss:>8f} \n")
+    
+    return eval_loss, eval_epoch_acc
+
+
+def CAM_loop(dataloader, model, save_path, device, attribute_list, threshold = 0.8, dataset = 'TA'):
+    """Dataset argument shows which dataset is used to enuse correct save path. Saves an image with the input image
+    and the resulting Class Activation Map in a file of your choice (save_path).
+    One heatmap generated per attribute.
+    Model can be a path or ResNet object. cv2 image visualization was partly
+    taken from zhoubolei on 17/8/22 on:
+        https://github.com/zhoubolei/CAM/blob/master/pytorch_CAM.py"""
+    # import packages
+    import torch
+    import torch.cuda
+    import cv2
+    import numpy as np
+    import os
+
+    
+    # initialize the model
+    model.to(device)
+    
+    # loop though the data
+    with torch.no_grad():
+        for X, y, p in dataloader:
+            X = X.to(device)
+            y = y.to(device).float()
+            cam, pred = model(X)
+            
+    
+            for t in range(len(X)):
+                for num in range(len(pred)):
+                    if pred[t][num] >= threshold:
+                        img = cv2.imread(p[t])
+                        np_cam = np.array(X[t].reshape(len(attribute_list),224,224).detach().to('cpu')*255, dtype=np.uint8)
+                        height, width, _ = img.shape
+                
+                        heatmap = cv2.applyColorMap(cv2.resize(np_cam[num],(width, height)), cv2.COLORMAP_JET)
+                        result = cv2.addWeighted(heatmap, 0.3, img, 0.7, 0)
+                        
+                        if dataset == 'TA':
+                            split_1 = p[t].split('\\')
+                            split_2 = split_1[-1]
+                            split_3 = split_2[:-5].split('/')
+                            save_name = split_3[0] + '_' + split_3[1] + '_' + attribute_list[num] + '_' + str(round(float(pred[t][num], 2))) + '.png'
+                            cv2.imwrite(os.path.join(save_path, save_name), result)
+                        
+                        elif dataset == 'AADB':
+                            split_1 = p[t].split('\\')
+                            split_2 = split_1[-1].split('.')
+                            save_name = split_2[0] + '_' + attribute_list[num] + '_' + str(round(float(pred[t][num], 2))) + '.png'
+                            cv2.imwrite(os.path.join(save_path, save_name), result)
+                            
