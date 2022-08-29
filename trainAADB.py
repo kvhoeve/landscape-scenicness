@@ -73,7 +73,8 @@ preprocess = transforms.Compose([
 epochs = 100
 b_size = 16
 num_worker = 0
-early_stop_tol = 101 # to disable increase to > epochs
+early_stop_tol = 15
+early_stop_epoch = 1
 epoch_num = 0
 best_eval_loss = 1_000_000.
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -154,11 +155,19 @@ for t in range(epochs):
         # implement early stopping if tolerance is crossed
         early_stop += 1
         if early_stop >= early_stop_tol:
+            # create a performance overview
+            performance_overview(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, eval_acc_list, file_name='model_{}_overview_{}.txt'.format(model_name, timestamp))
+            # create performance figure
+            performance_fig(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, fig_name='model_{}_overview_{}.png'.format(model_name, timestamp))
             print("We are stopping at epoch:", epoch_num + 1)
             break
 
     epoch_num += 1
+    early_stop_epoch += 1
 
+# save final epoch model
+model_path = './data/AADB/models/model_{}_{}_{}.pth'.format(model_name, timestamp, epoch_num + 1)
+torch.save(model, model_path)    
 print("Finished training!")
 
 
