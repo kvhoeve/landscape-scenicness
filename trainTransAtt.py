@@ -50,7 +50,7 @@ make_dir(base_path, cam_path)
 
 extract_tarfile(base_path, "annotations", doc_name="annotations")
 extract_tarfile(base_path, "unaligned_images", doc_name="imageLD")
-
+extract_tarfile(base_path, "training_test_splits", doc_name="holdout_split")
 
 # =============== transform ==============
 preprocess = transforms.Compose([
@@ -65,9 +65,10 @@ preprocess = transforms.Compose([
 # =============== hyper parameters ==============
 
 epochs = 100
-b_size = 16
+b_size = 8
 num_worker = 0
-early_stop_tol = 101 # to disable increase to > epochs
+early_stop_tol = 1
+early_stop_epoch = 1
 epoch_num = 0
 best_eval_loss = 1_000_000.
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -76,17 +77,20 @@ model_name = 'resnet50'
 
 # =============== model ==============
 # Loading in the ResNet-X model from the Pytorch repository
-model = torch.hub.load('pytorch/vision:v0.10.0', model_name, pretrained=True)
-num_features = model.fc.in_features
-model.fc = nn.Sequential(
-    nn.Linear(num_features, 40),
-    nn.Sigmoid())
+# model = torch.hub.load('pytorch/vision:v0.10.0', model_name, pretrained=True)
+# num_features = model.fc.in_features
+# model.fc = nn.Sequential(
+#    nn.Linear(num_features, 40),
+#    nn.Sigmoid())
+
+model = TACAM()
 model.to(device)
 
 # =============== Dataloaders ==============
 # split the data into train (80%), validation (10%) and test (10%) sets
 
-train_data, val_data, test_data = random_split(dataset=TransAttributes(root=base_path, transform=preprocess), lengths=[6857, 857,857])
+train_data, val_data = random_split(dataset=TransAttributes(root=base_path, split="train", transform=preprocess), lengths=[6047, 857])
+test_data = TransAttributes(root=base_path, split="test", transform=preprocess)
 
 train_dataloader = DataLoader(train_data, batch_size=b_size, shuffle=True, num_workers=num_worker, pin_memory=True)
 eval_dataloader = DataLoader(val_data, batch_size=b_size, shuffle=True, num_workers=num_worker, pin_memory=True)
@@ -119,13 +123,13 @@ d1 = timedelta(hours=int(start_time[0:2]), minutes=int(start_time[3:5]), seconds
 
 for t in range(epochs):
     print(f"Epoch {epoch_num + 1}\n-------------------------------")
-    avg_train_loss, lbl_list, pred_list = train_loop(train_dataloader, model, loss_fn, optimizer, epoch_index=t, device=device)
+    avg_train_loss, lbl_list, pred_list = cam_train(train_dataloader, model, loss_fn, optimizer, epoch_index=t, device=device)
     train_loss_list.append(avg_train_loss)
     # visualize training
     prediction_fig(lbl_list, pred_list)
     
     # evaluation
-    avg_eval_loss, eval_acc = eval_loop(eval_dataloader, model, loss_fn, device=device)
+    avg_eval_loss, eval_acc = cam_eval(eval_dataloader, model, loss_fn, device=device)
     eval_loss_list.append(avg_eval_loss)
     eval_acc_list.append(eval_acc)
     
@@ -135,7 +139,7 @@ for t in range(epochs):
                     { 'Training' : avg_train_loss, 'Validation' : avg_eval_loss },
                     epoch_num + 1)
     writer.flush()
-
+    
     # Track the best performance, and save the model's state
     if avg_eval_loss < best_eval_loss:
         best_eval_loss = avg_eval_loss
@@ -145,10 +149,15 @@ for t in range(epochs):
         # implement early stopping if tolerance is crossed
         early_stop += 1
         if early_stop >= early_stop_tol:
+            # performance overview
+            performance_overview(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, eval_acc_list, file_path='./data/transient_attributes/models', file_name='model_{}_overview_{}.txt'.format(model_name, timestamp))
+            # performance figure
+            performance_fig(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, fig_path='./data/transient_attributes/figures', fig_name='model_{}_overview_{}.png'.format(model_name, timestamp))
             print("We are stopping at epoch:", epoch_num + 1)
             break
 
     epoch_num += 1
+    early_stop_epoch += 1
 
 print("Finished training!")
 
