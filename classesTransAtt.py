@@ -156,9 +156,10 @@ class TACAM(nn.Module):
         self.base = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', pretrained=True)
         self.base.fc = nn.Identity()
         self.base.avgpool = nn.Identity()
-        self.cam = nn.Sequential(nn.Conv2d(2048, 40, 1), 
+        self.cam = nn.Sequential(nn.Conv2d(2048, 40, 1),
                                  nn.AdaptiveAvgPool2d(224))
-        self.score = nn.Sequential(nn.AdaptiveAvgPool2d(1))
+        self.score = nn.Sequential(nn.Sigmoid(),
+                                   nn.AdaptiveAvgPool2d(1))
         
     def forward(self, img):
         x = self.base(img)
