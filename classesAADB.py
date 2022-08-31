@@ -152,7 +152,8 @@ class AADBCAM(nn.Module):
         self.base.avgpool = nn.Identity()
         self.cam = nn.Sequential(nn.Conv2d(2048, 12, 1), 
                                  nn.AdaptiveAvgPool2d(224))
-        self.score = nn.Sequential(nn.AdaptiveAvgPool2d(1))
+        self.score = nn.Sequential(nn.Tanh(),
+                                   nn.AdaptiveAvgPool2d(1))
         
     def forward(self, img):
         x = self.base(img)
@@ -160,4 +161,67 @@ class AADBCAM(nn.Module):
         scores = self.score(maps)        
         
         return maps, scores
+
+
+# Loss classes adapted from isaaccorley on 30/8/2022 at
+# https://github.com/isaaccorley/deep-aesthetics-pytorch/blob/main/torch_aesthetics/losses.py
+
+class RankLoss(nn.Module):
+    """y_pred are the predictions from the model, y_true are the labels
+    from the dataset (ground truth). Both consist of a tuple containig two 
+    tensors.
+    This class prepares a target; a tensor in the shape of y_true[0]
+    containing values of 1, but will be come -1 where y_true[0] is smaller 
+    than y_true[1]. This will create the ranks. This is then put into the 
+    standard pytorch margin rnaking loss function. 
+    """
+    def __init__(self, margin):
+        super().__init__()
+        self.margin=margin
+
+    def forward(self, y_pred, y_true):
+       
+        device, dtype = y_pred[0].device, y_pred[0].dtype
+
+        target = torch.ones_like(y_true[0]).to(device).to(dtype)
+
+        # Set indices where y_true1 < y_true2 to -1
+        target[y_true[0] < y_true[1]] = -1.0
+
+        return nn.MarginRankingLoss(
+            y_pred[0],
+            y_pred[1],
+            target,
+            margin=self.margin
+        )
+
+
+class RegRankLoss(nn.Module):
+    """This function calls two loss functions, MSEloss (regression loss)
+    and marginRankingLoss. It then adds these two together to
+    a combined loss."""
+    def __init__(self, margin):
+        super().__init__()
+        self.reg_loss = nn.MSELoss(reduction="mean")
+        self.rank_loss = nn.MarginRankingLoss(margin)
+        
+
+    def forward(self, y_pred, y_true):
+        
+        loss_reg = (
+            self.reg_loss(y_pred[0], y_true[0]) +
+            self.reg_loss(y_pred[1], y_true[1])
+        ) / 2.0
+        
+        device, dtype = y_pred[0].device, y_pred[0].dtype
+        
+        # create a target for all the ranks
+        target = torch.ones_like(y_true[0]).to(device).to(dtype)
+
+        # Set indices where y_true1 < y_true2 to -1
+        target[y_true[0] < y_true[1]] = -1.0
+        
+        loss_rank = self.rank_loss(y_pred[0], y_pred[1], target)
+        loss = loss_reg + loss_rank
+        return loss, loss_reg, loss_rank
 
