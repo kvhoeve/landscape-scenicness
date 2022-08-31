@@ -73,7 +73,7 @@ preprocess = transforms.Compose([
 epochs = 100
 b_size = 16
 num_worker = 0
-early_stop_tol = 15
+early_stop_tol = 10
 early_stop_epoch = 1
 epoch_num = 0
 best_eval_loss = 1_000_000.
@@ -103,7 +103,8 @@ eval_dataloader = DataLoader(val_data, batch_size=b_size, shuffle=True, num_work
 test_dataloader = DataLoader(test_data, batch_size=b_size, shuffle=True, num_workers=num_worker, pin_memory=True)
 
 # =============== loss & optimizer ==============
-    
+
+loss_train = RegRankLoss(margin=0.02)   
 loss_fn = nn.MSELoss()
 # learning rate is scheduled in the training loop (see functions.py)
 optimizer = torch.optim.Adam(model.parameters())
@@ -116,6 +117,7 @@ writer = SummaryWriter('./data/AADB/runs/AADB_{}_trainer_{}'.format(model_name, 
 
 
 train_loss_list = []
+train_reg_list = []
 eval_loss_list = []
 eval_acc_list = []
 epoch_list = list(range(1, epochs + 1, 1))
@@ -129,10 +131,12 @@ d1 = timedelta(hours=int(start_time[0:2]), minutes=int(start_time[3:5]), seconds
 
 for t in range(epochs):
     print(f"Epoch {epoch_num + 1}\n-------------------------------")
-    avg_train_loss, lbl_list, pred_list = train_loop(train_dataloader, model, loss_fn, optimizer, epoch_index=t, device=device)
+   # avg_train_loss, lbl_list, pred_list = train_loop(train_dataloader, model, loss_fn, optimizer, epoch_index=t, device=device)
+    avg_train_loss, avg_reg_loss = aadb_train(train_dataloader, model, loss_train, optimizer, epoch_index=t, device=device)
     train_loss_list.append(avg_train_loss)
+    train_reg_list.append(avg_reg_loss)
     # visualize training
-    prediction_fig(lbl_list, pred_list)
+   # prediction_fig(lbl_list, pred_list)
     
     # evaluation
     avg_eval_loss, eval_acc = eval_loop(eval_dataloader, model, loss_fn, device=device)
@@ -151,14 +155,15 @@ for t in range(epochs):
         best_eval_loss = avg_eval_loss
         model_path = './data/AADB/models/model_{}_{}_{}.pth'.format(model_name, timestamp, epoch_num + 1)
         torch.save(model, model_path)
+        early_stop = 0
     else:
         # implement early stopping if tolerance is crossed
         early_stop += 1
         if early_stop >= early_stop_tol:
             # create a performance overview
-            performance_overview(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, eval_acc_list, file_name='model_{}_overview_{}.txt'.format(model_name, timestamp))
+            performance_overview(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, eval_acc_list, file_name='model_{}_overview_{}.txt'.format(model_name, timestamp), r_list=train_reg_list)
             # create performance figure
-            performance_fig(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, fig_name='model_{}_overview_{}.png'.format(model_name, timestamp))
+            performance_fig(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, fig_name='model_{}_overview_{}.png'.format(model_name, timestamp), extra_list=train_reg_list,)
             print("We are stopping at epoch:", epoch_num + 1)
             break
 
@@ -168,6 +173,7 @@ for t in range(epochs):
 # save final epoch model
 model_path = './data/AADB/models/model_{}_{}_{}.pth'.format(model_name, timestamp, epoch_num + 1)
 torch.save(model, model_path)    
+
 print("Finished training!")
 
 
@@ -179,9 +185,9 @@ print("The time passed: " + str(time_pass))
 
 
 # create a performance overview
-performance_overview(epoch_list, train_loss_list, eval_loss_list, eval_acc_list, file_name='model_{}_overview_{}.txt'.format(model_name, timestamp))
+performance_overview(epoch_list, train_loss_list, eval_loss_list, eval_acc_list, file_name='model_{}_overview_{}.txt'.format(model_name, timestamp), r_list=train_reg_list)
 
 # create performance figure
-performance_fig(epoch_list, train_loss_list, eval_loss_list, fig_name='model_{}_overview_{}.png'.format(model_name, timestamp))
+performance_fig(epoch_list, train_loss_list, eval_loss_list, fig_name='model_{}_overview_{}.png'.format(model_name, timestamp), extra_list=train_reg_list)
 
 # =================================================================================================================
