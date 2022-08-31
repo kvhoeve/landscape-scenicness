@@ -222,17 +222,69 @@ def test_loop(dataloader, model, loss_fn, device, attributes=None):
         
     #return testloop_loss, test_acc, target_list, prediction_list
 
+# adapted from isaaccorley on 30/08/2022 at
+# https://github.com/isaaccorley/deep-aesthetics-pytorch/blob/main/train.py
+def aadb_train(dataloader, model, loss_fn, optimizer, epoch_index, device):
+    """Loops through training data and makes predictions for the data.
+    Records the loss claculated by the loss functions."""
+    # import pacakges
+    import torch
+    import torch.cuda
+    
+    # turn on model train mode
+    model.train()
 
+    # assigning important variables
+    running_loss = 0.
+    running_reg = 0.
+    num_batches = len(dataloader)
+    size = len(dataloader.dataset)
+    optimizer.param_groups[0]["lr"] = exp_decay(epoch=epoch_index)
+
+    for batch, (X, y, p) in enumerate(dataloader):
+        # place data on device
+        X = X.to(device)
+        y = y.to(device).float()
+        # split batches in two to be able to rank them
+        x1, x2 = torch.split(X, int(len(X)/2), dim=0)
+        y1, y2 = torch.split(y, int(len(X)/2), dim=0)
+
+        # Compute prediction and loss
+        pred1 = model(x1)
+        pred2 = model(x2)
+        loss, loss_reg, loss_rank = loss_fn(y_pred=(pred1, pred2), 
+                                            y_true=(y1, y2))
+
+        # Backpropagation
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        running_loss += loss.item()
+        running_reg += loss_reg.item()
+        if batch % 100 == 0:
+           loss, current = loss.item(), batch * len(X)
+           print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+           
+          
+    last_loss = running_loss/num_batches
+    last_reg =  running_reg/num_batches      
+    print("Epoch {}, Combined Loss: {:.4f}, Reg Loss: {:.4f}, Rank Loss: {:.4f} ".format(
+        epoch_index+1, float(loss), float(loss_reg), float(loss_rank)))
+
+    
+    return last_loss, last_reg
 
 
 
 # =================== performance functions ====================
 
 def performance_overview(e_list, 
-                         t_list, 
+                         t_list,
                          v_list, 
                          a_list,                           
                          file_name,
+                         r_list=None,
                          file_path='./data/AADB/models'):
     """Creates a pandas dataframe with perfromance statistics for an overview.
     Returns the pandas dataframe, but saves it as a text file."""    
@@ -241,15 +293,23 @@ def performance_overview(e_list,
     import pandas as pd
 
     # create a csv file with the accuracies over time
-    acc_dict = {"epochs": e_list,
-                "training loss": t_list,
-                "validation loss": v_list,
-                "validation accuracy" : a_list}
+    if r_list == None:
+        acc_dict = {"epochs": e_list,
+                    "training loss": t_list,
+                    "validation loss": v_list,
+                    "validation accuracy" : a_list}
+    else:
+        acc_dict = {"epochs": e_list,
+                    "training loss": t_list,
+                    "regression loss": r_list,
+                    "validation loss": v_list,
+                    "validation accuracy" : a_list}
+        
     run_data = pd.DataFrame(acc_dict)
     run_data.to_csv(os.path.join(file_path, file_name), sep=" ")
     return(run_data)
 
-def performance_fig(epochs_list, training_loss, validation_loss, fig_name, fig_path="./data/AADB/figures"):
+def performance_fig(epochs_list, training_loss, validation_loss, fig_name, extra_list=None, fig_path="./data/AADB/figures"):
     # taken from the pyplot manual on 26/7/2022
     # https://matplotlib.org/stable/tutorials/introductory/usage.html#sphx-glr-tutorials-introductory-usage-py
     """Creates a figure showing the performance of the model. Uses matplotlib pyplot """
@@ -263,6 +323,12 @@ def performance_fig(epochs_list, training_loss, validation_loss, fig_name, fig_p
     fig, ax = plt.subplots(figsize=(25, 12.5))
     ax.plot(epochs_list, training_loss, label='Training loss')
     ax.plot(epochs_list, validation_loss, label= 'Validation loss')
+    
+    if extra_list != None:
+        ax.plot(epochs_list, extra_list, label='Regression loss')
+    else:
+        pass
+    
     ax.set_title('Train loss and Validation loss over epochs')
     ax.set_xlabel('Epochs')
     ax.set_ylabel('Loss')
@@ -324,6 +390,7 @@ def cam_train(dataloader, model, loss_fn, optimizer, epoch_index, device):
     running_loss = 0.
     last_loss = 0.
     size = len(dataloader.dataset)
+    num_batches = len(dataloader)
     target_list = []
     prediction_list = []
     optimizer.param_groups[0]["lr"] = exp_decay(epoch=epoch_index)
@@ -353,10 +420,9 @@ def cam_train(dataloader, model, loss_fn, optimizer, epoch_index, device):
         running_loss += loss.item()
         if batch % 100 == 0:
             loss, current = loss.item(), batch * len(X)
-            last_loss = running_loss/100
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
-            running_loss = 0.
-
+        
+    last_loss = running_loss/num_batches
     
     return last_loss, target_list, prediction_list
 
