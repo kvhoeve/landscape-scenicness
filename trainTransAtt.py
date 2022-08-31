@@ -64,10 +64,10 @@ preprocess = transforms.Compose([
 
 # =============== hyper parameters ==============
 
-epochs = 100
+epochs = 50
 b_size = 8
 num_worker = 0
-early_stop_tol = 1
+early_stop_tol = 5
 early_stop_epoch = 1
 epoch_num = 0
 best_eval_loss = 1_000_000.
@@ -145,6 +145,7 @@ for t in range(epochs):
         best_eval_loss = avg_eval_loss
         model_path = './data/transient_attributes/models/model_{}_{}_{}.pth'.format(model_name, timestamp, epoch_num + 1)
         torch.save(model, model_path)
+        early_stop = 0
     else:
         # implement early stopping if tolerance is crossed
         early_stop += 1
