@@ -92,6 +92,7 @@ def train_loop(dataloader, model, loss_fn, optimizer, epoch_index, device):
     running_loss = 0.
     last_loss = 0.
     size = len(dataloader.dataset)
+    num_batches = len(dataloader)
     target_list = []
     prediction_list = []
     optimizer.param_groups[0]["lr"] = exp_decay(epoch=epoch_index)
@@ -118,14 +119,20 @@ def train_loop(dataloader, model, loss_fn, optimizer, epoch_index, device):
                 target_list.append(target_label)
                 prediction_list.append(prediction_label)
         
+      #  for t in range(len(y)):        
+      #      target_label = float(y[t].detach().to('cpu'))
+      #      prediction_label = float(pred[t].detach().to('cpu'))
+      #      target_list.append(target_label)
+      #      prediction_list.append(prediction_label)
+        
         running_loss += loss.item()
         if batch % 100 == 0:
             loss, current = loss.item(), batch * len(X)
-            last_loss = running_loss/100
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
-            running_loss = 0.
+            
 
-    
+    last_loss = running_loss/num_batches    
+
     return last_loss, target_list, prediction_list
 
 
@@ -147,13 +154,18 @@ def eval_loop(dataloader, model, loss_fn, device):
             pred = model(X)
             eval_loss += loss_fn(pred, y).item()
             # keeping track of the number of correctly predicted numbers
+           
+          #  for t in range(len(y)):
+          #      if torch.round(y[t], decimals=1) == torch.round(pred[t], decimals=1):
+          #          correct += 1
             for t in range(len(y)):
-                for num in torch.round(y[t], decimals=1) == torch.round(pred[t], decimals=1):
-                    if num:
-                        correct += 1
+               for num in torch.round(y[t], decimals=1) == torch.round(pred[t], decimals=1):
+                   if num:
+                       correct += 1
 
     eval_loss /= num_batches
     eval_epoch_acc = correct / (size * len(y[1]))
+    #eval_epoch_acc = correct / size
     print(f"Eval Error: \n Accuracy: {(100*eval_epoch_acc):>0.1f}%, Avg loss: {eval_loss:>8f} \n")
     
     return eval_loss, eval_epoch_acc
@@ -179,33 +191,49 @@ def test_loop(dataloader, model, loss_fn, device, attributes=None):
             pred = model(X)
             testloop_loss += loss_fn(pred, y).item()
             
-            # tally correct values for accuracy
             for t in range(len(y)):
-                for num in torch.round(y[t], decimals=1) == torch.round(pred[t], decimals=1):
-                    if num:
-                        correct += 1
-                # create long lists with target and predictions for all images in the set
-                for i in range(len(y[1])):
-                    target_label = float(y[t][i].detach().to('cpu'))
-                    prediction_label = float(pred[t][i].detach().to('cpu'))
-                    target_list.append(target_label)
-                    prediction_list.append(prediction_label)
+                target_label = float(y[t].detach().to('cpu'))
+                prediction_label = float(pred[t].detach().to('cpu'))
+                target_list.append(target_label)
+                prediction_list.append(prediction_label)
+                
+                
+                if torch.round(y[t], decimals=1) == torch.round(pred[t], decimals=1):
+                    correct += 1
                     
+            
+            # tally correct values for accuracy
+          #  for t in range(len(y)):
+          #      for num in torch.round(y[t], decimals=1) == torch.round(pred[t], decimals=1):
+          #          if num:
+          #              correct += 1
+                        
+                # create long lists with target and predictions for all images in the set
+              #  for i in range(len(y[1])):
+              #      target_label = float(y[t][i].detach().to('cpu'))
+              #      prediction_label = float(pred[t][i].detach().to('cpu'))
+              #      target_list.append(target_label)
+              #      prediction_list.append(prediction_label)
+        
+                            
     
+                    
     # metrics                    
     testloop_loss /= num_batches
-    test_acc = correct / (size * len(y[1]))
+   # test_acc = correct / (size * len(y[1]))
+    test_acc = correct / size
     
     # calculate the 
-    for u in range(len(y[1])):
-        att_targetscore = []
-        att_predscore = []
-        for att in range(u, len(target_list), len(y[1])):
-            att_targetscore.append(target_list[att])
-            att_predscore.append(prediction_list[att])
+   # for u in range(len(y[0])):
+   #     att_targetscore = []
+   #     att_predscore = []
+   #     for att in range(u, len(target_list), len(y[1])):
+   #         att_targetscore.append(target_list[att])
+   #         att_predscore.append(prediction_list[att])
         
-        s_r = spearmanr(torch.Tensor(att_targetscore), torch.Tensor(att_predscore))
-        spearman_list.append(s_r)
+    #    s_r = spearmanr(torch.Tensor(att_targetscore), torch.Tensor(att_predscore))
+    s_r = spearmanr(torch.Tensor(target_list), torch.Tensor(prediction_list))
+    spearman_list.append(s_r)
         
     # printing results    
     print(f"Test Error: \n Accuracy: {(100 * test_acc):>0.1f}%, Avg loss: {testloop_loss:>8f} \n")
@@ -275,8 +303,98 @@ def aadb_train(dataloader, model, loss_fn, optimizer, epoch_index, device):
     
     return last_loss, last_reg
 
+def tuned_train(dataloader, model, loss_fn, optimizer, epoch_index, device):
+    """Loops through training data and makes predictions for the data.
+    Records the loss claculated by the loss functions. This loop has been altered
+    to boost the losses from """
+    # import pacakges
+    import torch
+    import torch.cuda
+    
+    # turn on model train mode
+    model.train()
 
+    # assigning important variables
+    running_loss = 0.
+    last_loss = 0.
+    size = len(dataloader.dataset)
+    num_batches = len(dataloader)
+    target_list = []
+    prediction_list = []
+    optimizer.param_groups[0]["lr"] = exp_decay(epoch=epoch_index)
 
+    for batch, (X, y, p) in enumerate(dataloader):
+        # place data on device
+        X = X.to(device)
+        y = y.to(device).float()
+
+        # Compute prediction and loss
+        pred = model(X)
+        loss = loss_fn(pred, y)
+        w_loss = torch.cat(tensors=(loss[:,0], loss[:,1]*2 , loss[:,2], 
+                                    loss[:,3], loss[:,4], loss[:,5], loss[:,6]*5,
+                                    loss[:,7], loss[:,8]*2, loss[:,9]*2,
+                                    loss[:,10]*5, loss[:,11]), dim=0)
+        weighted_loss = torch.mean(w_loss)
+        
+
+        # Backpropagation
+        optimizer.zero_grad()
+        weighted_loss.backward()
+        optimizer.step()
+        
+        # append labels to arrays for plotting
+        for t in range(len(y)):
+            for i in range(len(y[1])):
+                target_label = float(y[t][i].detach().to('cpu'))
+                prediction_label = float(pred[t][i].detach().to('cpu'))
+                target_list.append(target_label)
+                prediction_list.append(prediction_label)
+        
+        running_loss += weighted_loss.item()
+        if batch % 100 == 0:
+            l, current = weighted_loss.item(), batch * len(X)
+            print(f"loss: {l:>7f}  [{current:>5d}/{size:>5d}]")
+            
+    last_loss = running_loss/num_batches
+    
+    return last_loss, target_list, prediction_list
+
+def tuned_eval(dataloader, model, loss_fn, device):
+    """Ëvaluation of the model on the evaluation dataset. Used for tuning."""
+    # import packages
+    import torch
+    import torch.cuda
+    
+    model.eval()
+    size = len(dataloader.dataset)
+    num_batches = len(dataloader)
+    eval_loss, correct = 0, 0
+
+    with torch.no_grad():
+        for X, y, p in dataloader:
+            X = X.to(device)
+            y = y.to(device).float()
+            pred = model(X)
+            loss = loss_fn(pred, y)
+            w_loss = torch.cat(tensors=(loss[:,0], loss[:,1]*2 , loss[:,2], 
+                                        loss[:,3], loss[:,4], loss[:,5], loss[:,6]*5,
+                                        loss[:,7], loss[:,8]*2, loss[:,9]*2,
+                                        loss[:,10]*5, loss[:,11]), dim=0)
+            weighted_loss = torch.mean(w_loss)
+            
+            eval_loss += weighted_loss.item()
+            # keeping track of the number of correctly predicted numbers
+            for t in range(len(y)):
+                for num in torch.round(y[t], decimals=1) == torch.round(pred[t], decimals=1):
+                    if num:
+                        correct += 1
+
+    eval_loss /= num_batches
+    eval_epoch_acc = correct / (size * len(y[1]))
+    print(f"Eval Error: \n Accuracy: {(100*eval_epoch_acc):>0.1f}%, Avg loss: {eval_loss:>8f} \n")
+    
+    return eval_loss, eval_epoch_acc
 # =================== performance functions ====================
 
 def performance_overview(e_list, 
@@ -487,11 +605,11 @@ def CAM_loop(dataloader, model, save_path, device, attribute_list, threshold = 0
             cam, pred = model(X)
             
     
-            for t in range(len(X)):
+            for t in range(len(cam)):
                 for num in range(len(pred)):
-                    if pred[t][num] >= threshold:
+                    if pred[t][num].item() >= threshold:
                         img = cv2.imread(p[t])
-                        np_cam = np.array(X[t].reshape(len(attribute_list),224,224).detach().to('cpu')*255, dtype=np.uint8)
+                        np_cam = np.array(cam[t].reshape(len(attribute_list),7,7).detach().to('cpu')*255, dtype=np.uint8)
                         height, width, _ = img.shape
                 
                         heatmap = cv2.applyColorMap(cv2.resize(np_cam[num],(width, height)), cv2.COLORMAP_JET)
@@ -501,12 +619,14 @@ def CAM_loop(dataloader, model, save_path, device, attribute_list, threshold = 0
                             split_1 = p[t].split('\\')
                             split_2 = split_1[-1]
                             split_3 = split_2[:-5].split('/')
-                            save_name = split_3[0] + '_' + split_3[1] + '_' + attribute_list[num] + '_' + str(round(float(pred[t][num], 2))) + '.png'
+                            save_name = split_3[0] + '_' + split_3[1] + '_' + attribute_list[num] + '_' + str(round(float(pred[t][num].item()), 2)) + '.png'
                             cv2.imwrite(os.path.join(save_path, save_name), result)
                         
                         elif dataset == 'AADB':
                             split_1 = p[t].split('\\')
                             split_2 = split_1[-1].split('.')
-                            save_name = split_2[0] + '_' + attribute_list[num] + '_' + str(round(float(pred[t][num], 2))) + '.png'
+                            save_name = split_2[0] + '_' + attribute_list[num] + '_' + str(round(float(pred[t][num]), 2)) + '.png'
                             cv2.imwrite(os.path.join(save_path, save_name), result)
-                            
+                        
+                        else:
+                            print('Does nothing')
