@@ -113,14 +113,29 @@ class AADB(Dataset):
         labels_path = os.path.join(self.root, self.lbl_root, self.labels_file)
         labels = loadmat(labels_path)["dataset"]
         labels = labels[self.splits[split]["idx"]]
+################################################        
+      #  idx_list =[]
+      #  tens_list=[]
+      #  for i in range(len(labels)):
+      #      if labels[i][10] > 0.0:
+      #          idx_list.append(i)
+      #          tens_list.append(labels[i][6])
+###################### tens_list veranderen ##################        
         labels = np.array(labels)
+        labels = np.delete(labels, [6], 1)
 
         # Load file paths
         files_path = os.path.join(self.root, self.lbl_root, self.splits[split]["file"])
         with open(files_path, "r") as f:
             files = f.read().strip().splitlines()
             files = [f.split()[0] for f in files]
+ #############################################################           
+          #  file_list=[]
+          #  for d in idx_list[:100]:
+          #      file_list.append(files[d])
+ ######################## vergeet niet file_list te veranderen! #####################################           
             files = [os.path.join(self.img_root, f) for f in files]
+            
 
         return files, labels
 
@@ -133,9 +148,11 @@ class AADB(Dataset):
 
         img_name = os.path.join(self.root, self.files[idx])
         x = pil_loader(img_name)
+        ############### vergeet niet np.asarray weg te halen############
+     #   y = torch.from_numpy(np.asarray(self.labels[idx]))
         y = torch.from_numpy(self.labels[idx])
         if self.transform:
-            x = self.transform(x)
+             x = self.transform(x)
 
         return x, y, img_name
 
@@ -150,8 +167,7 @@ class AADBCAM(nn.Module):
         self.base = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', pretrained=True)
         self.base.fc = nn.Identity()
         self.base.avgpool = nn.Identity()
-        self.cam = nn.Sequential(nn.Conv2d(2048, 12, 1), 
-                                 nn.AdaptiveAvgPool2d(224))
+        self.cam = nn.Sequential(nn.Conv2d(2048, 12, 1))
         self.score = nn.Sequential(nn.Tanh(),
                                    nn.AdaptiveAvgPool2d(1))
         
