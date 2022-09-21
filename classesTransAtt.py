@@ -153,22 +153,19 @@ class TACAM(nn.Module):
         Lastly, another avreage pool layer creates the score per attribute."""        
         super(TACAM, self).__init__()
         
-        self.base = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', pretrained=True)
-        self.base.fc = nn.Identity()
-        self.base.avgpool = nn.Identity()
-        self.cam = nn.Sequential(nn.Conv2d(2048, 40, 1),
-                                 nn.AdaptiveAvgPool2d(224))
-        self.score = nn.Sequential(nn.Sigmoid(),
-                                   nn.AdaptiveAvgPool2d(1))
+        base = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', pretrained=True)
+        self.resnet_baseline = nn.Sequential(*list(base.children())[:-2])
+        self.cam = nn.Conv2d(2048, 40, 1)
+        self.score = nn.Sequential(nn.AdaptiveAvgPool2d(1),
+                                   nn.Sigmoid())
         
     def forward(self, img):
-        x = self.base(img)
-        maps = self.cam(torch.reshape(x, (len(img), 2048, 7, 7)))
+        x = self.resnet_baseline(img)
+        maps = self.cam(x)
         scores = self.score(maps)        
         
         return maps, scores
              
-            
-        
+                  
         
     
