@@ -70,10 +70,10 @@ preprocess = transforms.Compose([
 
 # =============== hyper parameters ==============
 
-epochs = 100
+epochs = 50
 b_size = 16
 num_worker = 0
-early_stop_tol = 10
+early_stop_tol = 5
 early_stop_epoch = 1
 epoch_num = 0
 best_eval_loss = 1_000_000.
@@ -87,7 +87,7 @@ model_name = 'resnet50'
 model = torch.hub.load('pytorch/vision:v0.10.0', model_name, pretrained=True)
 num_features = model.fc.in_features
 model.fc = nn.Sequential(
-    nn.Linear(num_features, 12),
+    nn.Linear(num_features, 11),
     nn.Tanh())
 model.to(device)
 
@@ -104,8 +104,12 @@ test_dataloader = DataLoader(test_data, batch_size=b_size, shuffle=True, num_wor
 
 # =============== loss & optimizer ==============
 
-loss_train = RegRankLoss(margin=0.02)   
-loss_fn = nn.MSELoss()
+# for combined rank and regression loss
+# loss_train = RegRankLoss(margin=0.02)
+loss_fn = nn.MSELoss() 
+
+# for weighted loss  
+#loss_train = nn.MSELoss(reduction='none')
 # learning rate is scheduled in the training loop (see functions.py)
 optimizer = torch.optim.Adam(model.parameters())
 
@@ -117,7 +121,7 @@ writer = SummaryWriter('./data/AADB/runs/AADB_{}_trainer_{}'.format(model_name, 
 
 
 train_loss_list = []
-train_reg_list = []
+# train_reg_list = []
 eval_loss_list = []
 eval_acc_list = []
 epoch_list = list(range(1, epochs + 1, 1))
@@ -131,12 +135,12 @@ d1 = timedelta(hours=int(start_time[0:2]), minutes=int(start_time[3:5]), seconds
 
 for t in range(epochs):
     print(f"Epoch {epoch_num + 1}\n-------------------------------")
-   # avg_train_loss, lbl_list, pred_list = train_loop(train_dataloader, model, loss_fn, optimizer, epoch_index=t, device=device)
-    avg_train_loss, avg_reg_loss = aadb_train(train_dataloader, model, loss_train, optimizer, epoch_index=t, device=device)
+    avg_train_loss, lbl_list, pred_list = train_loop(train_dataloader, model, loss_fn, optimizer, epoch_index=t, device=device)
+   # avg_train_loss, lbl_list, pred_list = tuned_train(train_dataloader, model, loss_train, optimizer, epoch_index=t, device=device)
     train_loss_list.append(avg_train_loss)
-    train_reg_list.append(avg_reg_loss)
+    # train_reg_list.append(avg_reg_loss)
     # visualize training
-   # prediction_fig(lbl_list, pred_list)
+    prediction_fig(lbl_list, pred_list)
     
     # evaluation
     avg_eval_loss, eval_acc = eval_loop(eval_dataloader, model, loss_fn, device=device)
@@ -161,9 +165,11 @@ for t in range(epochs):
         early_stop += 1
         if early_stop >= early_stop_tol:
             # create a performance overview
-            performance_overview(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, eval_acc_list, file_name='model_{}_overview_{}.txt'.format(model_name, timestamp), r_list=train_reg_list)
+            # performance_overview(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, eval_acc_list, file_name='model_{}_overview_{}.txt'.format(model_name, timestamp), r_list=train_reg_list)
+            performance_overview(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, eval_acc_list, file_name='model_{}_overview_{}.txt'.format(model_name, timestamp))
             # create performance figure
-            performance_fig(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, fig_name='model_{}_overview_{}.png'.format(model_name, timestamp), extra_list=train_reg_list,)
+            # performance_fig(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, fig_name='model_{}_overview_{}.png'.format(model_name, timestamp), extra_list=train_reg_list)
+            performance_fig(list(range(1, early_stop_epoch + 1, 1)), train_loss_list, eval_loss_list, fig_name='model_{}_overview_{}.png'.format(model_name, timestamp))
             print("We are stopping at epoch:", epoch_num + 1)
             break
 
@@ -185,9 +191,9 @@ print("The time passed: " + str(time_pass))
 
 
 # create a performance overview
-performance_overview(epoch_list, train_loss_list, eval_loss_list, eval_acc_list, file_name='model_{}_overview_{}.txt'.format(model_name, timestamp), r_list=train_reg_list)
-
+# performance_overview(epoch_list, train_loss_list, eval_loss_list, eval_acc_list, file_name='model_{}_overview_{}.txt'.format(model_name, timestamp), r_list=train_reg_list)
+performance_overview(epoch_list, train_loss_list, eval_loss_list, eval_acc_list, file_name='model_{}_overview_{}.txt'.format(model_name, timestamp))
 # create performance figure
-performance_fig(epoch_list, train_loss_list, eval_loss_list, fig_name='model_{}_overview_{}.png'.format(model_name, timestamp), extra_list=train_reg_list)
-
+# performance_fig(epoch_list, train_loss_list, eval_loss_list, fig_name='model_{}_overview_{}.png'.format(model_name, timestamp), extra_list=train_reg_list)
+performance_fig(epoch_list, train_loss_list, eval_loss_list, fig_name='model_{}_overview_{}.png'.format(model_name, timestamp))
 # =================================================================================================================
